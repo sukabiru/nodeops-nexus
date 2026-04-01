@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NodeOps — Network Command Center</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230D0D12'/><circle cx='16' cy='16' r='6' fill='none' stroke='%2300E5A0' stroke-width='2'/><circle cx='16' cy='8' r='2' fill='%2300E5A0'/><circle cx='22.9' cy='20' r='2' fill='%2300E5A0'/><circle cx='9.1' cy='20' r='2' fill='%2300E5A0'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07070B;
+  --bg2:#0D0D14;
+  --bg3:#111119;
+  --bg4:#16161F;
+  --bdr:#1C1C28;
+  --bdr-glow:#00E5A033;
+  --acc:#00E5A0;
+  --acc2:#6C5CE7;
+  --acc3:#00B4D8;
+  --acc-dim:#00E5A066;
+  --acc-bg:#00E5A00D;
+  --t1:#E8E8ED;
+  --t2:#8888A0;
+  --t3:#55556A;
+  --red:#FF4D6A;
+  --warn:#FFB84D;
+  --r:12px;
+  --rs:8px;
+  --rl:16px;
+  --glow:0 0 20px #00E5A022,0 0 40px #00E5A011;
+  --glow2:0 0 20px #00E5A033,0 0 60px #00E5A018;
+  --tr:all .3s cubic-bezier(.4,0,.2,1);
+}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:'Space Grotesk',system-ui,sans-serif;background:var(--bg);color:var(--t1);line-height:1.6;overflow-x:hidden;min-height:100vh}
+::selection{background:var(--acc);color:var(--bg)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--t3)}
+
+#networkCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.35}
+.app{position:relative;z-index:1}
+
+/* ── Nav ── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(7,7,11,.82);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border-bottom:1px solid var(--bdr);padding:0 2rem;height:64px;display:flex;align-items:center;justify-content:space-between;transition:var(--tr)}
+.nav.scrolled{box-shadow:0 4px 30px rgba(0,0,0,.4)}
+.nav-brand{display:flex;align-items:center;gap:.75rem;text-decoration:none}
+.nav-logo{width:36px;height:36px;position:relative}
+.nav-logo svg{width:100%;height:100%}
+.nav-logo .ring{position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--acc-dim);animation:ring 2.5s ease-out infinite}
+@keyframes ring{0%{transform:scale(.9);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+.nav-txt{font-size:1.15rem;font-weight:600;letter-spacing:-.02em}
+.nav-txt span{color:var(--acc)}
+.nav-links{display:flex;gap:.25rem;align-items:center}
+.nav-link{padding:.5rem 1rem;border-radius:var(--rs);color:var(--t2);font-size:.875rem;font-weight:500;text-decoration:none;transition:var(--tr);cursor:pointer;border:none;background:none;font-family:inherit}
+.nav-link:hover,.nav-link.active{color:var(--t1);background:var(--acc-bg)}
+.nav-link.active{color:var(--acc)}
+.nav-right{display:flex;gap:.75rem;align-items:center}
+.nav-status{display:flex;align-items:center;gap:.5rem;padding:.375rem .875rem;border-radius:99px;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.15);font-size:.75rem;color:var(--acc);font-weight:500}
+.nav-status .dot{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-c{padding:.5rem 1.25rem;border-radius:var(--rs);background:var(--acc);color:var(--bg);font-size:.875rem;font-weight:600;border:none;cursor:pointer;font-family:inherit;transition:var(--tr);letter-spacing:-.01em}
+.btn-c:hover{box-shadow:var(--glow2);transform:translateY(-1px)}
+
+/* ── Main ── */
+main{padding-top:64px}
+.section{padding:3rem 2rem;max-width:1440px;margin:0 auto}
+.section-lab{font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem}
+.section-lab::before{content:'';width:12px;height:1px;background:var(--acc)}
+.section-ttl{font-size:1.75rem;font-weight:700;letter-spacing:-.03em;line-height:1.2}
+.section-ttl span{color:var(--acc)}
+.section-hdr{margin-bottom:2rem}
+
+/* ── Hero ── */
+.hero{padding:6rem 2rem 3rem;text-align:center;position:relative;max-width:1440px;margin:0 auto}
+.hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem 1rem;border-radius:99px;background:var(--acc-bg);border:1px solid rgba(0,229,160,.15);font-size:.75rem;font-weight:500;color:var(--acc);margin-bottom:1.5rem}
+.hero-badge .dot{width:5px;height:5px;border-radius:50%;background:var(--acc);animation:blink 2s ease-in-out infinite}
+.hero h1{font-size:clamp(2.5rem,6vw,4.5rem);font-weight:700;letter-spacing:-.04em;line-height:1.05;margin-bottom:1.25rem}
+.hero h1 .grad{background:linear-gradient(135deg,var(--acc) 0%,var(--acc3) 50%,var(--acc2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:1.1rem;color:var(--t2);max-width:640px;margin:0 auto 2.5rem;line-height:1.65}
+.hero-actions{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.btn-p{padding:.75rem 2rem;border-radius:var(--rs);background:var(--acc);color:var(--bg);font-size:.9375rem;font-weight:600;border:none;cursor:pointer;font-family:inherit;transition:var(--tr);display:inline-flex;align-items:center;gap:.5rem}
+.btn-p:hover{box-shadow:var(--glow2);transform:translateY(-2px)}
+.btn-s{padding:.75rem 2rem;border-radius:var(--rs);background:transparent;color:var(--t1);font-size:.9375rem;font-weight:500;cursor:pointer;font-family:inherit;transition:var(--tr);border:1px solid var(--bdr);display:inline-flex;align-items:center;gap:.5rem}
+.btn-s:hover{border-color:var(--acc-dim);background:var(--acc-bg)}
+
+/* ── Stats Bar ── */
+.stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--bdr);border-radius:var(--rl);overflow:hidden;margin-bottom:1rem;border:1px solid var(--bdr)}
+.stat-cell{background:var(--bg3);padding:1.5rem;text-align:center;transition:var(--tr)}
+.stat-cell:hover{background:var(--bg4)}
+.stat-v{font-size:1.75rem;font-weight:700;letter-spacing:-.03em;font-family:'JetBrains Mono','Space Grotesk',monospace;margin-bottom:.25rem}
+.stat-v.a{color:var(--acc)}.stat-v.b{color:var(--acc2)}.stat-v.c{color:var(--acc3)}.stat-v.w{color:var(--warn)}
+.stat-l{font-size:.75rem;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;font-weight:500}
+.stat-ch{font-size:.7rem;font-weight:600;margin-top:.25rem;display:inline-flex;align-items:center;gap:.25rem}
+.stat-ch.up{color:var(--acc)}.stat-ch.dn{color:var(--red)}
+
+/* ── Cards ── */
+.cgrid{display:grid;gap:1rem}
+.cgrid.c2{grid-template-columns:repeat(2,1fr)}
+.cgrid.c3{grid-template-columns:repeat(3,1fr)}
+.cgrid.c4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);padding:1.5rem;transition:var(--tr);position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--acc-dim),transparent);opacity:0;transition:var(--tr)}
+.card:hover{border-color:var(--bdr-glow);transform:translateY(-2px)}
+.card:hover::before{opacity:1}
+.card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.card-t{font-size:.9375rem;font-weight:600;letter-spacing:-.01em}
+.card-i{width:36px;height:36px;border-radius:var(--rs);display:flex;align-items:center;justify-content:center;font-size:1.1rem}
+.card-i.g{background:rgba(0,229,160,.1);color:var(--acc)}
+.card-i.p{background:rgba(108,92,231,.1);color:var(--acc2)}
+.card-i.bl{background:rgba(0,180,216,.1);color:var(--acc3)}
+.card-i.o{background:rgba(255,184,77,.1);color:var(--warn)}
+.card-i.r{background:rgba(255,77,106,.1);color:var(--red)}
+.card-bn{font-size:2rem;font-weight:700;letter-spacing:-.03em;font-family:'JetBrains Mono','Space Grotesk',monospace;margin-bottom:.25rem}
+.card-sub{font-size:.8rem;color:var(--t2)}
+.chart-area{width:100%;height:180px;position:relative;margin-top:1rem}
+.chart-area canvas{width:100%!important;height:100%!important}
+.mini-chart{height:80px}
+
+/* ── Tag ── */
+.tag{padding:.2rem .5rem;border-radius:4px;font-size:.7rem;font-weight:500;display:inline-block}
+.tag.g{background:rgba(0,229,160,.1);color:var(--acc)}
+.tag.p{background:rgba(108,92,231,.1);color:var(--acc2)}
+.tag.bl{background:rgba(0,180,216,.1);color:var(--acc3)}
+.tag.o{background:rgba(255,184,77,.1);color:var(--warn)}
+.tag.r{background:rgba(255,77,106,.1);color:var(--red)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.75rem}
+
+/* ── Node Map ── */
+.map-wrap{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden;position:relative}
+.map-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.map-canvas{width:100%;height:420px;position:relative}
+#worldMap{width:100%;height:100%}
+.map-legend{position:absolute;bottom:1rem;left:1rem;display:flex;gap:1rem;background:rgba(7,7,11,.8);backdrop-filter:blur(8px);padding:.5rem 1rem;border-radius:var(--rs);border:1px solid var(--bdr);font-size:.7rem}
+.ml-item{display:flex;align-items:center;gap:.375rem;color:var(--t2)}
+.ml-dot{width:8px;height:8px;border-radius:50%}
+
+/* ── Deploy Panel ── */
+.deploy-panel{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden}
+.deploy-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.deploy-body{padding:1.5rem;display:grid;gap:1.25rem}
+.deploy-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.fg{display:flex;flex-direction:column;gap:.375rem}
+.fl{font-size:.75rem;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.08em}
+.fi,.fs{padding:.625rem .875rem;border-radius:var(--rs);background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);font-size:.875rem;font-family:inherit;transition:var(--tr);outline:none;-webkit-appearance:none;appearance:none}
+.fi:focus,.fs:focus{border-color:var(--acc-dim);box-shadow:0 0 0 3px var(--acc-bg)}
+.fs{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238888A0' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center;padding-right:2rem}
+.slider-wrap{display:flex;flex-direction:column;gap:.5rem}
+.slider-top{display:flex;justify-content:space-between;align-items:baseline}
+.slider-val{font-family:'JetBrains Mono',monospace;font-size:.875rem;color:var(--acc);font-weight:600}
+input[type="range"]{width:100%;height:4px;border-radius:2px;background:var(--bdr);outline:none;-webkit-appearance:none;appearance:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 8px var(--acc-dim)}
+.deploy-cost{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;background:var(--acc-bg);border:1px solid rgba(0,229,160,.12);border-radius:var(--rs)}
+.cost-lab{font-size:.875rem;color:var(--t2)}
+.cost-val{font-family:'JetBrains Mono',monospace;font-size:1.25rem;font-weight:700;color:var(--acc)}
+.btn-deploy{width:100%;padding:.875rem;border-radius:var(--rs);background:linear-gradient(135deg,var(--acc),#00C48C);color:var(--bg);font-size:1rem;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:var(--tr);letter-spacing:-.01em}
+.btn-deploy:hover{box-shadow:var(--glow2);transform:translateY(-1px)}
+
+/* ── Table ── */
+.tbl-wrap{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden}
+.tbl-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.tbl-search{padding:.4rem .75rem;border-radius:var(--rs);background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);font-size:.8rem;font-family:inherit;outline:none;transition:var(--tr);width:220px}
+.tbl-search:focus{border-color:var(--acc-dim)}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--bg2)}
+th{padding:.75rem 1.25rem;text-align:left;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);border-bottom:1px solid var(--bdr)}
+td{padding:.875rem 1.25rem;font-size:.8125rem;border-bottom:1px solid var(--bdr);color:var(--t2)}
+tr:hover td{background:var(--bg4)}
+.nd-name{color:var(--t1);font-weight:500;display:flex;align-items:center;gap:.5rem}
+.ind{width:8px;height:8px;border-radius:50%}
+.ind.on{background:var(--acc);box-shadow:0 0 6px var(--acc)}
+.ind.sync{background:var(--warn);box-shadow:0 0 6px var(--warn)}
+.ind.off{background:var(--red);box-shadow:0 0 6px var(--red)}
+.ubar{width:100px;height:4px;border-radius:2px;background:var(--bdr);display:inline-block;vertical-align:middle;margin-right:.5rem;position:relative}
+.ubar-fill{height:100%;border-radius:2px;position:absolute;top:0;left:0}
+
+/* ── Token ── */
+.token-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.token-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);padding:2rem;display:flex;flex-direction:column}
+.token-pair{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem}
+.token-sym{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc3));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;color:var(--bg)}
+.token-name{font-size:1.1rem;font-weight:600}
+.token-ticker{font-size:.8rem;color:var(--t3)}
+.token-price{font-size:2.75rem;font-weight:700;letter-spacing:-.04em;font-family:'JetBrains Mono','Space Grotesk',monospace;margin-bottom:.5rem}
+.token-metrics{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:auto}
+.tm{padding:.75rem;background:var(--bg2);border-radius:var(--rs)}
+.tm-v{font-family:'JetBrains Mono',monospace;font-size:.9375rem;font-weight:600;margin-bottom:.125rem}
+.tm-l{font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.08em}
+.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.tier{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);padding:1.5rem;transition:var(--tr);position:relative;overflow:hidden}
+.tier.feat{border-color:var(--acc-dim)}
+.tier.feat::after{content:'POPULAR';position:absolute;top:12px;right:-28px;background:var(--acc);color:var(--bg);font-size:.6rem;font-weight:700;letter-spacing:.08em;padding:.2rem 2rem;transform:rotate(45deg)}
+.tier:hover{border-color:var(--bdr-glow);transform:translateY(-3px)}
+.tier-name{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:.75rem}
+.tier-apy{font-size:2.25rem;font-weight:700;color:var(--acc);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em}
+.tier-apy-l{font-size:.75rem;color:var(--t2);margin-bottom:1rem}
+.tier-d{display:flex;justify-content:space-between;padding:.5rem 0;border-top:1px solid var(--bdr);font-size:.8rem}
+.tier-dl{color:var(--t3)}.tier-dv{color:var(--t1);font-weight:500}
+.btn-stake{width:100%;margin-top:1rem;padding:.625rem;border-radius:var(--rs);background:transparent;border:1px solid var(--acc-dim);color:var(--acc);font-size:.8125rem;font-weight:600;cursor:pointer;font-family:inherit;transition:var(--tr)}
+.btn-stake:hover{background:var(--acc);color:var(--bg)}
+
+/* ── Marketplace ── */
+.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem}
+.mp-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden;transition:var(--tr)}
+.mp-card:hover{border-color:var(--bdr-glow);transform:translateY(-3px)}
+.mp-top{padding:1.5rem;border-bottom:1px solid var(--bdr)}
+.mp-prov{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}
+.mp-ava{width:40px;height:40px;border-radius:var(--rs);display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700}
+.mp-pn{font-weight:600;font-size:.9375rem}
+.mp-pr{font-size:.75rem;color:var(--warn)}
+.mp-specs{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.mp-spec{display:flex;flex-direction:column;gap:.125rem}
+.mp-sl{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--t3)}
+.mp-sv{font-size:.85rem;font-weight:500;font-family:'JetBrains Mono',monospace}
+.mp-bot{padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.mp-price{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.1rem;color:var(--acc)}
+.mp-pu{font-size:.7rem;color:var(--t3);font-weight:400}
+.btn-rent{padding:.5rem 1.25rem;border-radius:var(--rs);background:transparent;border:1px solid var(--acc-dim);color:var(--acc);font-size:.8125rem;font-weight:600;cursor:pointer;font-family:inherit;transition:var(--tr)}
+.btn-rent:hover{background:var(--acc);color:var(--bg)}
+
+/* ── Terminal ── */
+.term-wrap{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden}
+.term-bar{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;background:var(--bg2);border-bottom:1px solid var(--bdr)}
+.term-dot{width:10px;height:10px;border-radius:50%}
+.term-dot.rd{background:#FF5F57}.term-dot.yl{background:#FEBC2E}.term-dot.gn{background:#28C840}
+.term-title{flex:1;text-align:center;font-size:.75rem;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.term-body{padding:1rem 1.25rem;height:320px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.7}
+.term-line{margin-bottom:2px;white-space:pre-wrap;word-break:break-all}
+.term-line .prompt{color:var(--acc)}
+.term-line .cmd{color:var(--t1)}
+.term-line .out{color:var(--t2)}
+.term-line .success{color:var(--acc)}
+.term-line .err{color:var(--red)}
+.term-line .info{color:var(--acc3)}
+.term-line .warn{color:var(--warn)}
+.term-input-wrap{display:flex;align-items:center;padding:0 1.25rem .75rem;font-family:'JetBrains Mono',monospace;font-size:.8rem}
+.term-prompt{color:var(--acc);white-space:nowrap;margin-right:.5rem}
+.term-input{flex:1;background:none;border:none;color:var(--t1);font-family:'JetBrains Mono',monospace;font-size:.8rem;outline:none;caret-color:var(--acc)}
+
+/* ── AI Agents ── */
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.agent-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);padding:1.5rem;transition:var(--tr);position:relative;overflow:hidden}
+.agent-card:hover{border-color:var(--bdr-glow);transform:translateY(-2px)}
+.agent-header{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}
+.agent-avatar{width:44px;height:44px;border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+.agent-name{font-weight:600;font-size:.9375rem}
+.agent-type{font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em}
+.agent-status{display:flex;align-items:center;gap:.375rem;font-size:.75rem;margin-bottom:.75rem}
+.agent-status .dot{width:6px;height:6px;border-radius:50%}
+.agent-status.running .dot{background:var(--acc);box-shadow:0 0 6px var(--acc);animation:blink 1.5s ease-in-out infinite}
+.agent-status.idle .dot{background:var(--t3)}
+.agent-status.running{color:var(--acc)}
+.agent-status.idle{color:var(--t3)}
+.agent-metric{display:flex;justify-content:space-between;padding:.4rem 0;border-top:1px solid var(--bdr);font-size:.8rem}
+.agent-ml{color:var(--t3)}
+.agent-mv{font-family:'JetBrains Mono',monospace;color:var(--t1);font-weight:500}
+.btn-agent{width:100%;margin-top:1rem;padding:.5rem;border-radius:var(--rs);background:transparent;border:1px solid var(--bdr);color:var(--t2);font-size:.8rem;font-weight:500;cursor:pointer;font-family:inherit;transition:var(--tr)}
+.btn-agent:hover{border-color:var(--acc-dim);color:var(--acc);background:var(--acc-bg)}
+
+/* ── Health Monitor ── */
+.health-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem}
+.health-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;text-align:center;transition:var(--tr)}
+.health-card:hover{border-color:var(--bdr-glow)}
+.health-gauge{width:90px;height:90px;margin:0 auto .75rem;position:relative}
+.health-gauge svg{transform:rotate(-90deg);width:100%;height:100%}
+.health-gauge circle{fill:none;stroke-linecap:round}
+.health-gauge .bg{stroke:var(--bdr);stroke-width:5}
+.health-gauge .fill{stroke-width:5;transition:stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1)}
+.health-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.1rem}
+.health-name{font-size:.85rem;font-weight:500;margin-bottom:.25rem}
+.health-sub{font-size:.7rem;color:var(--t3)}
+
+/* ── Feed ── */
+.feed{display:flex;flex-direction:column;gap:.5rem}
+.feed-item{display:flex;align-items:center;gap:1rem;padding:.875rem 1rem;border-radius:var(--rs);background:var(--bg3);border:1px solid var(--bdr);transition:var(--tr)}
+.feed-item:hover{background:var(--bg4)}
+.feed-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
+.feed-text{flex:1;font-size:.8125rem}
+.feed-text strong{color:var(--t1);font-weight:600}
+.feed-time{font-size:.7rem;color:var(--t3);white-space:nowrap;font-family:'JetBrains Mono',monospace}
+
+/* ── CreateOS Workspaces ── */
+.ws-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
+.ws-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden;transition:var(--tr)}
+.ws-card:hover{border-color:var(--bdr-glow);transform:translateY(-2px)}
+.ws-preview{height:140px;background:var(--bg2);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.ws-preview-icon{font-size:2.5rem;opacity:.4}
+.ws-preview-tag{position:absolute;top:.75rem;right:.75rem}
+.ws-info{padding:1.25rem}
+.ws-title{font-weight:600;font-size:.9375rem;margin-bottom:.25rem}
+.ws-desc{font-size:.8rem;color:var(--t2);margin-bottom:.75rem;line-height:1.5}
+.ws-meta{display:flex;gap:1rem;font-size:.7rem;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.ws-actions{display:flex;gap:.5rem;padding:0 1.25rem 1.25rem}
+.btn-ws{flex:1;padding:.5rem;border-radius:var(--rs);font-size:.8rem;font-weight:500;cursor:pointer;font-family:inherit;transition:var(--tr);text-align:center}
+.btn-ws.primary{background:var(--acc);color:var(--bg);border:none}
+.btn-ws.primary:hover{box-shadow:var(--glow)}
+.btn-ws.secondary{background:transparent;color:var(--t2);border:1px solid var(--bdr)}
+.btn-ws.secondary:hover{border-color:var(--acc-dim);color:var(--acc)}
+
+/* ── Footer ── */
+.footer{border-top:1px solid var(--bdr);padding:3rem 2rem 2rem;margin-top:3rem}
+.footer-inner{max-width:1440px;margin:0 auto;display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:2rem}
+.footer-brand{max-width:300px}
+.footer-bn{font-size:1.1rem;font-weight:600;margin-bottom:.5rem}
+.footer-bn span{color:var(--acc)}
+.footer-brand p{font-size:.8rem;color:var(--t3);line-height:1.6}
+.footer-links{display:flex;gap:3rem}
+.footer-col h4{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:.75rem}
+.footer-col a{display:block;font-size:.8125rem;color:var(--t2);text-decoration:none;padding:.25rem 0;transition:var(--tr)}
+.footer-col a:hover{color:var(--acc)}
+.footer-bot{max-width:1440px;margin:2rem auto 0;padding-top:1.5rem;border-top:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;font-size:.75rem;color:var(--t3)}
+
+/* ── Animations ── */
+.fade-up{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+.s1{transition-delay:.1s}.s2{transition-delay:.2s}.s3{transition-delay:.3s}.s4{transition-delay:.4s}
+
+/* ── Responsive ── */
+@media(max-width:1024px){
+  .cgrid.c3,.cgrid.c4{grid-template-columns:repeat(2,1fr)}
+  .token-grid{grid-template-columns:1fr}
+  .tiers{grid-template-columns:1fr 1fr}
+  .deploy-row{grid-template-columns:1fr}
+  .health-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:768px){
+  .nav{padding:0 1rem}
+  .nav-links{display:none}
+  .section{padding:2rem 1rem}
+  .hero{padding:4rem 1rem 2rem}
+  .cgrid.c2,.cgrid.c3,.cgrid.c4{grid-template-columns:1fr}
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+  .tiers{grid-template-columns:1fr}
+  .footer-inner{flex-direction:column}
+  .footer-links{flex-wrap:wrap;gap:2rem}
+  .map-canvas{height:260px}
+  .tbl-wrap{overflow-x:auto}
+  .health-grid{grid-template-columns:repeat(2,1fr)}
+  .agent-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .hero h1{font-size:2rem}
+  .hero-actions{flex-direction:column}
+  .stats-bar{grid-template-columns:1fr}
+  .health-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<canvas id="networkCanvas"></canvas>
+
+<div class="app">
+
+<!-- ── Navigation ── -->
+<nav class="nav" id="topNav">
+  <a href="#" class="nav-brand">
+    <div class="nav-logo">
+      <div class="ring"></div>
+      <svg viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="16" stroke="#00E5A0" stroke-width="1.5" opacity=".3"/>
+        <circle cx="18" cy="18" r="8" stroke="#00E5A0" stroke-width="2"/>
+        <circle cx="18" cy="8" r="3" fill="#00E5A0"/>
+        <circle cx="26.7" cy="23" r="3" fill="#00E5A0"/>
+        <circle cx="9.3" cy="23" r="3" fill="#00E5A0"/>
+        <line x1="18" y1="11" x2="24" y2="21" stroke="#00E5A0" stroke-width="1" opacity=".5"/>
+        <line x1="18" y1="11" x2="12" y2="21" stroke="#00E5A0" stroke-width="1" opacity=".5"/>
+        <line x1="12" y1="23" x2="24" y2="23" stroke="#00E5A0" stroke-width="1" opacity=".5"/>
+      </svg>
+    </div>
+    <div class="nav-txt">Node<span>Ops</span></div>
+  </a>
+  <div class="nav-links">
+    <button class="nav-link active" data-section="dashboard">Dashboard</button>
+    <button class="nav-link" data-section="nodes">Nodes</button>
+    <button class="nav-link" data-section="agents">AI Agents</button>
+    <button class="nav-link" data-section="workspaces">CreateOS</button>
+    <button class="nav-link" data-section="token">$NODE</button>
+    <button class="nav-link" data-section="activity">Activity</button>
+  </div>
+  <div class="nav-right">
+    <div class="nav-status"><span class="dot"></span> Mainnet Live</div>
+    <button class="btn-c" id="connectBtn">Connect Wallet</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- ── Hero ── -->
+<section class="hero fade-up">
+  <div class="hero-badge"><span class="dot"></span> Network Command Center</div>
+  <h1>The <span class="grad">Decentralized Infrastructure</span> Powering Web3</h1>
+  <p>Deploy nodes, orchestrate AI agents, rent global compute, stake $NODE, and manage CreateOS workspaces from a single command center.</p>
+  <div class="hero-actions">
+    <button class="btn-p" onclick="document.getElementById('deploy').scrollIntoView({behavior:'smooth'})">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+      Deploy a Node
+    </button>
+    <button class="btn-s" onclick="document.getElementById('agents').scrollIntoView({behavior:'smooth'})">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a4 4 0 014 4v1h2a2 2 0 012 2v2M12 2a4 4 0 00-4 4v1H6a2 2 0 00-2 2v2m8-9v4m-6 8h12a2 2 0 002-2v-3H4v3a2 2 0 002 2zm0 0v3m6-3v3m6-3v3"/></svg>
+      Explore AI Agents
+    </button>
+  </div>
+</section>
+
+<!-- ── Live Stats Bar ── -->
+<section class="section fade-up" id="dashboard">
+  <div class="section-hdr">
+    <div class="section-lab">Real-Time Metrics</div>
+    <div class="section-ttl">Network <span>Overview</span></div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-cell"><div class="stat-v a" id="totalNodes">12,847</div><div class="stat-l">Active Nodes</div><div class="stat-ch up">+2.4% &#8593;</div></div>
+    <div class="stat-cell"><div class="stat-v b" id="totalCompute">48.6 PF</div><div class="stat-l">Compute Power</div><div class="stat-ch up">+5.1% &#8593;</div></div>
+    <div class="stat-cell"><div class="stat-v c" id="totalStaked">284.5M</div><div class="stat-l">$NODE Staked</div><div class="stat-ch up">+1.8% &#8593;</div></div>
+    <div class="stat-cell"><div class="stat-v w" id="totalRevenue">$3.24M</div><div class="stat-l">Monthly Revenue</div><div class="stat-ch up">+12.3% &#8593;</div></div>
+    <div class="stat-cell"><div class="stat-v a" id="totalProviders">1,892</div><div class="stat-l">Providers</div><div class="stat-ch up">+3.7% &#8593;</div></div>
+    <div class="stat-cell"><div class="stat-v" id="avgUptime">99.97%</div><div class="stat-l">Avg Uptime</div><div class="stat-ch up">+0.02% &#8593;</div></div>
+  </div>
+  <div class="cgrid c4" style="margin-top:1rem">
+    <div class="card fade-up s1"><div class="card-h"><div class="card-t">Transactions</div><div class="card-i g">&#9889;</div></div><div class="card-bn" style="color:var(--acc)">1.2M</div><div class="card-sub">Last 24 hours</div><div class="chart-area mini-chart"><canvas id="chartTx"></canvas></div></div>
+    <div class="card fade-up s2"><div class="card-h"><div class="card-t">$NODE Burned</div><div class="card-i p">&#128293;</div></div><div class="card-bn" style="color:var(--acc2)">847K</div><div class="card-sub">Total tokens burned</div><div class="chart-area mini-chart"><canvas id="chartBurn"></canvas></div></div>
+    <div class="card fade-up s3"><div class="card-h"><div class="card-t">Deployments</div><div class="card-i bl">&#128640;</div></div><div class="card-bn" style="color:var(--acc3)">3,456</div><div class="card-sub">Active deployments</div><div class="chart-area mini-chart"><canvas id="chartDeploy"></canvas></div></div>
+    <div class="card fade-up s4"><div class="card-h"><div class="card-t">Network Rewards</div><div class="card-i o">&#128176;</div></div><div class="card-bn" style="color:var(--warn)">$89.4K</div><div class="card-sub">Distributed today</div><div class="chart-area mini-chart"><canvas id="chartRewards"></canvas></div></div>
+  </div>
+</section>
+
+<!-- ── Network Health Monitor ── -->
+<section class="section fade-up" id="health">
+  <div class="section-hdr">
+    <div class="section-lab">System Health</div>
+    <div class="section-ttl">Network <span>Health Monitor</span></div>
+  </div>
+  <div class="health-grid" id="healthGrid"></div>
+</section>
+
+<!-- ── Revenue Chart ── -->
+<section class="section fade-up">
+  <div class="card" style="padding:2rem">
+    <div class="card-h"><div><div class="card-t">Network Revenue &amp; Growth</div><div class="card-sub" style="margin-top:.25rem">Monthly revenue across all network services</div></div><div style="display:flex;gap:.5rem"><button class="nav-link active" data-range="6m" style="font-size:.75rem;padding:.35rem .75rem">6M</button><button class="nav-link" data-range="1y" style="font-size:.75rem;padding:.35rem .75rem">1Y</button><button class="nav-link" data-range="all" style="font-size:.75rem;padding:.35rem .75rem">All</button></div></div>
+    <div class="chart-area" style="height:280px"><canvas id="chartRevenue"></canvas></div>
+  </div>
+</section>
+
+<!-- ── AI Agents Orchestration ── -->
+<section class="section fade-up" id="agents">
+  <div class="section-hdr">
+    <div class="section-lab">AI Infrastructure</div>
+    <div class="section-ttl">AI Agent <span>Orchestration</span></div>
+  </div>
+  <div class="agent-grid" id="agentGrid"></div>
+</section>
+
+<!-- ── Node Map + Deploy ── -->
+<section class="section fade-up" id="nodes">
+  <div class="section-hdr">
+    <div class="section-lab">Global Infrastructure</div>
+    <div class="section-ttl">Node <span>Deployment</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:1rem" id="deploy">
+    <div class="map-wrap">
+      <div class="map-head"><div class="card-t">Global Node Distribution</div><div style="display:flex;gap:.5rem;align-items:center"><span class="tag g">12,847 nodes</span><span class="tag bl">42 regions</span></div></div>
+      <div class="map-canvas"><canvas id="worldMap"></canvas>
+        <div class="map-legend"><div class="ml-item"><div class="ml-dot" style="background:var(--acc)"></div>Validator</div><div class="ml-item"><div class="ml-dot" style="background:var(--acc2)"></div>RPC</div><div class="ml-item"><div class="ml-dot" style="background:var(--acc3)"></div>Compute</div><div class="ml-item"><div class="ml-dot" style="background:var(--warn)"></div>Storage</div></div>
+      </div>
+    </div>
+    <div class="deploy-panel">
+      <div class="deploy-head"><div class="card-t">Quick Deploy</div><div class="tag g">Live</div></div>
+      <div class="deploy-body">
+        <div class="deploy-row"><div class="fg"><label class="fl">Node Type</label><select class="fs" id="nodeType"><option>Validator Node</option><option>RPC Node</option><option>Full Node</option><option>Light Node</option><option>Archive Node</option></select></div><div class="fg"><label class="fl">Network</label><select class="fs" id="network"><option>Ethereum</option><option>Solana</option><option>Polygon</option><option>Arbitrum</option><option>Avalanche</option><option>Cosmos</option><option>Near</option><option>Aptos</option></select></div></div>
+        <div class="deploy-row"><div class="fg"><label class="fl">Region</label><select class="fs" id="region"><option>US East (Virginia)</option><option>US West (Oregon)</option><option>EU West (Frankfurt)</option><option>EU North (Stockholm)</option><option>Asia Pacific (Tokyo)</option><option>Asia Pacific (Singapore)</option></select></div><div class="fg"><label class="fl">Provider</label><select class="fs" id="provider"><option>Auto (Best Price)</option><option>NodeOps Verified</option><option>Community Provider</option></select></div></div>
+        <div class="slider-wrap"><div class="slider-top"><label class="fl">CPU Cores</label><span class="slider-val" id="cpuVal">8 cores</span></div><input type="range" min="2" max="64" value="8" id="cpuSlider"></div>
+        <div class="slider-wrap"><div class="slider-top"><label class="fl">Memory (RAM)</label><span class="slider-val" id="ramVal">16 GB</span></div><input type="range" min="4" max="256" value="16" step="4" id="ramSlider"></div>
+        <div class="slider-wrap"><div class="slider-top"><label class="fl">Storage (SSD)</label><span class="slider-val" id="storageVal">500 GB</span></div><input type="range" min="100" max="4000" value="500" step="100" id="storageSlider"></div>
+        <div class="deploy-cost"><span class="cost-lab">Estimated Monthly Cost</span><span class="cost-val" id="deployCost">$124.50</span></div>
+        <button class="btn-deploy" id="deployBtn">Deploy Node &#8594;</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Interactive Terminal ── -->
+<section class="section fade-up" id="terminal">
+  <div class="section-hdr">
+    <div class="section-lab">Command Line</div>
+    <div class="section-ttl">Live <span>Terminal</span></div>
+  </div>
+  <div class="term-wrap">
+    <div class="term-bar"><div class="term-dot rd"></div><div class="term-dot yl"></div><div class="term-dot gn"></div><div class="term-title">nodeops-cli ~ mainnet</div></div>
+    <div class="term-body" id="termBody"></div>
+    <div class="term-input-wrap"><span class="term-prompt">nodeops@mainnet:~$</span><input type="text" class="term-input" id="termInput" placeholder="Type a command... (help, status, deploy, nodes, agents, stake)" spellcheck="false" autocomplete="off"></div>
+  </div>
+</section>
+
+<!-- ── Active Nodes Table ── -->
+<section class="section fade-up">
+  <div class="tbl-wrap">
+    <div class="tbl-head"><div class="card-t">Active Nodes</div><input type="text" class="tbl-search" placeholder="Search nodes..." id="nodeSearch"></div>
+    <div style="overflow-x:auto">
+      <table id="nodesTable"><thead><tr><th>Node Name</th><th>Type</th><th>Network</th><th>Region</th><th>Uptime</th><th>Latency</th><th>Earnings</th><th>Status</th></tr></thead><tbody id="nodesBody"></tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ── CreateOS Workspaces ── -->
+<section class="section fade-up" id="workspaces">
+  <div class="section-hdr">
+    <div class="section-lab">CreateOS</div>
+    <div class="section-ttl">Workspace <span>Manager</span></div>
+  </div>
+  <div class="ws-grid" id="wsGrid"></div>
+</section>
+
+<!-- ── $NODE Token Economics ── -->
+<section class="section fade-up" id="token">
+  <div class="section-hdr">
+    <div class="section-lab">Token Economics</div>
+    <div class="section-ttl">$NODE <span>Analytics</span></div>
+  </div>
+  <div class="token-grid">
+    <div class="token-card">
+      <div class="token-pair"><div class="token-sym">N</div><div><div class="token-name">$NODE Token</div><div class="token-ticker">NODE / USDT</div></div></div>
+      <div class="token-price" style="color:var(--acc)" id="tokenPrice">$0.4872</div>
+      <div style="display:flex;gap:.75rem;margin-bottom:1.5rem"><span class="stat-ch up" style="font-size:.8rem">+8.42% (24h) &#8593;</span><span style="font-size:.8rem;color:var(--t3)">Vol: $12.4M</span></div>
+      <div class="chart-area" style="height:160px;margin-top:0"><canvas id="chartPrice"></canvas></div>
+      <div class="token-metrics" style="margin-top:1.25rem">
+        <div class="tm"><div class="tm-v" style="color:var(--acc)">$487.2M</div><div class="tm-l">Market Cap</div></div>
+        <div class="tm"><div class="tm-v" style="color:var(--acc2)">$1.24B</div><div class="tm-l">FDV</div></div>
+        <div class="tm"><div class="tm-v" style="color:var(--acc3)">847K</div><div class="tm-l">Tokens Burned</div></div>
+        <div class="tm"><div class="tm-v" style="color:var(--warn)">28.4%</div><div class="tm-l">Staked Supply</div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div class="card" style="flex:1"><div class="card-h"><div class="card-t">Token Distribution</div><div class="card-i g">&#128202;</div></div><div class="chart-area" style="height:200px"><canvas id="chartDistribution"></canvas></div></div>
+      <div class="card"><div class="card-h"><div class="card-t">Burn Mechanics</div><div class="card-i r">&#128293;</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
+          <div style="text-align:center;padding:.75rem;background:var(--bg2);border-radius:var(--rs)"><div class="mono" style="font-size:1rem;font-weight:700;color:var(--red)">2.1%</div><div style="font-size:.65rem;color:var(--t3);margin-top:.25rem">DEPLOY BURN</div></div>
+          <div style="text-align:center;padding:.75rem;background:var(--bg2);border-radius:var(--rs)"><div class="mono" style="font-size:1rem;font-weight:700;color:var(--warn)">1.5%</div><div style="font-size:.65rem;color:var(--t3);margin-top:.25rem">TX BURN</div></div>
+          <div style="text-align:center;padding:.75rem;background:var(--bg2);border-radius:var(--rs)"><div class="mono" style="font-size:1rem;font-weight:700;color:var(--acc2)">0.8%</div><div style="font-size:.65rem;color:var(--t3);margin-top:.25rem">STAKE BURN</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:2rem">
+    <div class="card-t" style="margin-bottom:1rem">Staking Tiers</div>
+    <div class="tiers">
+      <div class="tier"><div class="tier-name">Bronze</div><div class="tier-apy">8.2%</div><div class="tier-apy-l">Annual Percentage Yield</div><div class="tier-d"><span class="tier-dl">Min Stake</span><span class="tier-dv">1,000 NODE</span></div><div class="tier-d"><span class="tier-dl">Lock Period</span><span class="tier-dv">30 Days</span></div><div class="tier-d"><span class="tier-dl">Total Staked</span><span class="tier-dv">42.1M NODE</span></div><div class="tier-d"><span class="tier-dl">Stakers</span><span class="tier-dv">8,421</span></div><button class="btn-stake">Stake Now</button></div>
+      <div class="tier feat"><div class="tier-name">Silver</div><div class="tier-apy">14.5%</div><div class="tier-apy-l">Annual Percentage Yield</div><div class="tier-d"><span class="tier-dl">Min Stake</span><span class="tier-dv">10,000 NODE</span></div><div class="tier-d"><span class="tier-dl">Lock Period</span><span class="tier-dv">90 Days</span></div><div class="tier-d"><span class="tier-dl">Total Staked</span><span class="tier-dv">128.7M NODE</span></div><div class="tier-d"><span class="tier-dl">Stakers</span><span class="tier-dv">3,892</span></div><button class="btn-stake">Stake Now</button></div>
+      <div class="tier"><div class="tier-name">Gold</div><div class="tier-apy">22.8%</div><div class="tier-apy-l">Annual Percentage Yield</div><div class="tier-d"><span class="tier-dl">Min Stake</span><span class="tier-dv">100,000 NODE</span></div><div class="tier-d"><span class="tier-dl">Lock Period</span><span class="tier-dv">180 Days</span></div><div class="tier-d"><span class="tier-dl">Total Staked</span><span class="tier-dv">113.7M NODE</span></div><div class="tier-d"><span class="tier-dl">Stakers</span><span class="tier-dv">1,246</span></div><button class="btn-stake">Stake Now</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Compute Marketplace ── -->
+<section class="section fade-up" id="marketplace">
+  <div class="section-hdr">
+    <div class="section-lab">Decentralized Compute</div>
+    <div class="section-ttl">Compute <span>Marketplace</span></div>
+  </div>
+  <div class="mp-grid" id="mpGrid"></div>
+</section>
+
+<!-- ── Activity Feed ── -->
+<section class="section fade-up" id="activity">
+  <div class="section-hdr">
+    <div class="section-lab">Live Activity</div>
+    <div class="section-ttl">Network <span>Feed</span></div>
+  </div>
+  <div class="feed" id="activityFeed"></div>
+</section>
+
+</main>
+
+<!-- ── Footer ── -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-bn">Node<span>Ops</span> Network</div>
+      <p>The leading AI-powered DePIN Orchestration Layer. Deploy, scale, and coordinate decentralized infrastructure from a single command center.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col"><h4>Products</h4><a href="#">CreateOS</a><a href="#">Console</a><a href="#">Portal</a><a href="#">Cloud Marketplace</a></div>
+      <div class="footer-col"><h4>Network</h4><a href="#">Validators</a><a href="#">Providers</a><a href="#">Staking</a><a href="#">$NODE Token</a></div>
+      <div class="footer-col"><h4>Resources</h4><a href="#">Documentation</a><a href="#">API Reference</a><a href="#">Status Page</a><a href="#">Blog</a></div>
+      <div class="footer-col"><h4>Community</h4><a href="#">Discord</a><a href="#">Telegram</a><a href="#">Twitter / X</a><a href="#">GitHub</a></div>
+    </div>
+  </div>
+  <div class="footer-bot"><span>NodeOps Network. Decentralized Infrastructure, Simplified.</span><span>Built on CreateOS</span></div>
+</footer>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
